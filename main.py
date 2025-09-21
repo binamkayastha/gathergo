@@ -10,6 +10,7 @@ import requests
 import streamlit as st
 from streamlit_js_eval import streamlit_js_eval
 
+st.set_page_config(page_title="GatherGo")
 st.title('Gather Go')
 st.caption("Don't forget to add yourself!")
 
