@@ -1,15 +1,33 @@
+import hashlib
+import json
 import os
 from typing import Any, Dict, Optional
 
 import streamlit as st
 import pandas as pd
 import requests
+from streamlit_js_eval import streamlit_js_eval
 
 st.title('Gather Go')
 st.caption("Don't forget to add yourself!")
 
 if "contacts" not in st.session_state:
     st.session_state.contacts = []
+
+if "contacts_initialized" not in st.session_state:
+    loaded_contacts = streamlit_js_eval(
+        js_expressions="JSON.parse(window.localStorage.getItem('gathergo_contacts') || '[]')",
+        key="load_contacts",
+    )
+    if isinstance(loaded_contacts, list):
+        if not st.session_state.contacts:
+            st.session_state.contacts = loaded_contacts
+        st.session_state.contacts_initialized = True
+    elif st.session_state.contacts:
+        st.session_state.contacts_initialized = True
+
+if "clear_counter" not in st.session_state:
+    st.session_state.clear_counter = 0
 
 relationship_options = [
     "Select relationship",
@@ -138,6 +156,27 @@ if st.session_state.contacts:
     st.dataframe(contacts_df)
 else:
     st.info("Add someone to start building your list.")
+
+if st.button("Clear saved data", type="secondary"):
+    st.session_state.contacts = []
+    st.session_state.gemini_response = None
+    st.session_state.clear_counter += 1
+    streamlit_js_eval(
+        js_expressions="window.localStorage.removeItem('gathergo_contacts')",
+        key=f"clear_contacts_{st.session_state.clear_counter}",
+        want_return=False,
+    )
+    if trigger_rerun is not None:
+        trigger_rerun()
+
+contacts_json = json.dumps(st.session_state.contacts)
+encoded_json = json.dumps(contacts_json)
+storage_key = hashlib.sha256(contacts_json.encode("utf-8")).hexdigest()
+streamlit_js_eval(
+    js_expressions=f"window.localStorage.setItem('gathergo_contacts', {encoded_json})",
+    key=f"save_contacts_{storage_key}",
+    want_return=False,
+)
 
 st.write("---")
 
