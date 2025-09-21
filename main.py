@@ -162,7 +162,7 @@ else:
 
 if st.button("Clear saved data", type="secondary"):
     st.session_state.contacts = []
-    st.session_state.gemini_response = None
+    st.session_state.gemini_response_text = None
     st.session_state.clear_counter += 1
     streamlit_js_eval(
         js_expressions="window.localStorage.removeItem('gathergo_contacts')",
@@ -183,8 +183,8 @@ streamlit_js_eval(
 
 st.write("---")
 
-if "gemini_response" not in st.session_state:
-    st.session_state.gemini_response = None
+if "gemini_response_text" not in st.session_state:
+    st.session_state.gemini_response_text = None
 
 
 def get_self_contact(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
@@ -202,7 +202,7 @@ def get_self_contact(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
     return matches.iloc[0].to_dict()
 
 
-def call_gemini(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
+def call_gemini(contacts: pd.DataFrame) -> Optional[str]:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         st.error("GEMINI_API_KEY not set in environment.")
@@ -239,7 +239,13 @@ def call_gemini(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError, TypeError):
+            st.error("Gemini API response did not include text content.")
+            return None
     except requests.RequestException as exc:
         st.error(f"Gemini API request failed: {exc}")
     except ValueError:
@@ -304,8 +310,8 @@ with col_actions[1]:
         else:
             result = call_gemini(contacts_df)
             if result is not None:
-                st.session_state.gemini_response = result
+                st.session_state.gemini_response_text = result
 
-if st.session_state.gemini_response:
+if st.session_state.gemini_response_text:
     st.subheader("Gemini response")
-    st.json(st.session_state.gemini_response)
+    st.write(st.session_state.gemini_response_text)
