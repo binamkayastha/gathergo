@@ -3,14 +3,12 @@ import json
 import os
 from typing import Any, Dict, Optional
 
-import streamlit as st
+import matplotlib.pyplot as plt
+import networkx as nx
 import pandas as pd
 import requests
-from streamlit_js_eval import streamlit_js_eval
-
 import streamlit as st
-import networkx as nx
-import matplotlib.pyplot as plt
+from streamlit_js_eval import streamlit_js_eval
 
 st.title('Gather Go')
 st.caption("Don't forget to add yourself!")
@@ -155,8 +153,9 @@ if st.button("Add person"):
 if st.session_state.show_form:
     person_form_dialog()
 
-if st.session_state.contacts:
-    contacts_df = pd.DataFrame(st.session_state.contacts)
+contacts_df = pd.DataFrame(st.session_state.contacts)
+
+if not contacts_df.empty:
     st.dataframe(contacts_df)
 else:
     st.info("Add someone to start building your list.")
@@ -188,6 +187,21 @@ if "gemini_response" not in st.session_state:
     st.session_state.gemini_response = None
 
 
+def get_self_contact(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    if contacts.empty:
+        return None
+
+    relationship_col = contacts.get("relationship_type")
+    if relationship_col is None:
+        return None
+
+    matches = contacts[relationship_col.fillna("").str.lower() == "yourself"]
+    if matches.empty:
+        return None
+
+    return matches.iloc[0].to_dict()
+
+
 def call_gemini(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -200,12 +214,22 @@ def call_gemini(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
         "X-goog-api-key": api_key,
     }
 
+    self_contact = get_self_contact(contacts)
+    self_reference = "Yourself"
+    if self_contact:
+        self_reference = self_contact.get("person_name") or "Yourself"
+
     payload = {
         "contents": [
             {
                 "parts": [
                     {
-                        "text": "Please find ways that I can build stronger connections with the people in my contacts. I am 'Yourself' in this data: " + contacts.to_json(orient="records") if not contacts.empty else "[]",
+                        "text": (
+                            "Please find ways that I can build stronger connections with the people in my contacts. "
+                            f"I am '{self_reference}' in this data: " + contacts.to_json(orient="records")
+                        )
+                        if not contacts.empty
+                        else "[]",
                     }
                 ]
             }
@@ -228,40 +252,49 @@ col_actions = st.columns(2)
 
 with col_actions[0]:
     if st.button("Visualize connections"):
-        # Title
-        st.title("connection")
-        print(pd.DataFrame(st.session_state.contacts))
+        if contacts_df.empty:
+            st.warning("Add at least one contact to visualize connections.")
+        else:
+            self_contact = get_self_contact(contacts_df)
+            if not self_contact:
+                st.warning("Add yourself (relationship set to 'Yourself') so we know who to center the graph on.")
+            else:
+                central_node = self_contact.get("person_name") or "Yourself"
 
-        # Create graph
-        G = nx.Graph()
-        # Define nodes
-        central_node = "You"
-        other_nodes = pd.DataFrame(st.session_state.contacts).person_name
+                relationship_col = contacts_df.get("relationship_type")
+                if relationship_col is None:
+                    st.warning("Relationship info missing; add or edit contacts to include relationship details.")
+                else:
+                    mask = relationship_col.fillna("").str.lower() != "yourself"
+                    others_df = contacts_df[mask]
+                    other_nodes = [
+                        name
+                        for name in others_df.get("person_name", pd.Series(dtype=str)).dropna().unique()
+                        if name
+                    ]
 
-        # Create graph
-        G = nx.Graph()
-        G.add_node(central_node)
-        G.add_nodes_from(other_nodes)
+                    if not other_nodes:
+                        st.info("Add more people to see connections around you.")
+                    else:
+                        graph = nx.Graph()
+                        graph.add_node(central_node)
+                        graph.add_nodes_from(other_nodes)
 
-        # Add edges from Jun to everyone else
-        for node in other_nodes:
-            G.add_edge(central_node, node)
+                        for node in other_nodes:
+                            graph.add_edge(central_node, node)
 
-        # Draw graph
-        fig, ax = plt.subplots()
-        nx.draw(
-            G,
-            with_labels=True,
-            node_size=2000,
-            node_color="skyblue",
-            font_size=16,
-            font_weight="bold",
-            edge_color="gray",
-            ax=ax
-        )
-
-        # Display in Streamlit
-        st.pyplot(fig)
+                        fig, ax = plt.subplots()
+                        nx.draw(
+                            graph,
+                            with_labels=True,
+                            node_size=2000,
+                            node_color="skyblue",
+                            font_size=16,
+                            font_weight="bold",
+                            edge_color="gray",
+                            ax=ax,
+                        )
+                        st.pyplot(fig)
 
 
 with col_actions[1]:
@@ -269,12 +302,10 @@ with col_actions[1]:
         if not st.session_state.contacts:
             st.warning("Add at least one person before requesting plan suggestions.")
         else:
-            result = call_gemini(pd.DataFrame(st.session_state.contacts))
+            result = call_gemini(contacts_df)
             if result is not None:
                 st.session_state.gemini_response = result
 
 if st.session_state.gemini_response:
     st.subheader("Gemini response")
     st.json(st.session_state.gemini_response)
-
-
