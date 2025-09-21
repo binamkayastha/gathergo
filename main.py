@@ -220,17 +220,34 @@ def call_gemini(contacts: pd.DataFrame) -> Optional[str]:
     if self_contact:
         self_reference = self_contact.get("person_name") or "Yourself"
 
+    prompt_prefix = (
+        "You are an event planning assistant. Your job is to create a very short and succinct plan based on the information provided. "
+        "The plan must focus on five key areas:\n"
+        "Smart Scheduling: Propose an optimal time based on participant availability.\n"
+        "Interest-Based Suggestions: Recommend activities and venues that align with the group's common interests.\n"
+        "Venue & Logistics: Suggest a specific location and address key logistical needs.\n"
+        "Coordination: Outline a simple method for invites, RSVPs, and communication.\n"
+        "Contingency: Briefly suggest a backup plan for potential issues.\n\n"
+        "Your response should immediately identify the event type and provide clear, actionable recommendations. And make suggestions for specific people. \n"
+    )
+
+    if contacts.empty:
+        prompt_text = prompt_prefix + "\n\nNo participant data was provided."
+    else:
+        prompt_text = (
+            prompt_prefix
+            + "\n\nParticipant data (I am '"
+            + self_reference
+            + "' in this data): "
+            + contacts.to_json(orient="records")
+        )
+
     payload = {
         "contents": [
             {
                 "parts": [
                     {
-                        "text": (
-                            "Please find ways that I can build stronger connections with the people in my contacts. "
-                            f"I am '{self_reference}' in this data: " + contacts.to_json(orient="records")
-                        )
-                        if not contacts.empty
-                        else "[]",
+                        "text": prompt_text,
                     }
                 ]
             }
