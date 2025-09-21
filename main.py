@@ -77,6 +77,20 @@ relative_age_options = [
     "I don't know",
 ]
 
+RELATIONSHIP_EDGE_COLORS: Dict[str, str] = {
+    "yourself": "#0d6efd",
+    "immediate family": "#d9534f",
+    "extended family": "#f0ad4e",
+    "close friends": "#20c997",
+    "casual friends": "#6f42c1",
+    "acquaintance": "#6c757d",
+    "online/distant connection": "#17a2b8",
+    "in a relationship with": "#fd7e14",
+    "spouse": "#d63384",
+}
+
+DEFAULT_EDGE_COLOR = "#adb5bd"
+
 trigger_rerun = getattr(st, "rerun", None) or getattr(st, "experimental_rerun", None)
 
 if "show_form" not in st.session_state:
@@ -203,6 +217,20 @@ def get_self_contact(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
     return matches.iloc[0].to_dict()
 
 
+def edge_color_for_relationship(relationship: Optional[Any]) -> str:
+    if relationship is None:
+        return DEFAULT_EDGE_COLOR
+
+    if isinstance(relationship, float) and pd.isna(relationship):
+        return DEFAULT_EDGE_COLOR
+
+    rel_key = str(relationship).strip().lower()
+    if not rel_key:
+        return DEFAULT_EDGE_COLOR
+
+    return RELATIONSHIP_EDGE_COLORS.get(rel_key, DEFAULT_EDGE_COLOR)
+
+
 def call_gemini(contacts: pd.DataFrame) -> Optional[str]:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -291,11 +319,14 @@ with col_actions[0]:
                 else:
                     mask = relationship_col.fillna("").str.lower() != "yourself"
                     others_df = contacts_df[mask]
-                    other_nodes = [
-                        name
-                        for name in others_df.get("person_name", pd.Series(dtype=str)).dropna().unique()
-                        if name
-                    ]
+                    relationship_mapping: Dict[str, Optional[str]] = {}
+                    for _, row in others_df.iterrows():
+                        name = row.get("person_name")
+                        if not name:
+                            continue
+                        relationship_mapping.setdefault(name, row.get("relationship_type"))
+
+                    other_nodes = list(relationship_mapping.keys())
 
                     if not other_nodes:
                         st.info("Add more people to see connections around you.")
@@ -304,18 +335,26 @@ with col_actions[0]:
                         graph.add_node(central_node)
                         graph.add_nodes_from(other_nodes)
 
+                        edges = []
+                        edge_colors = []
                         for node in other_nodes:
                             graph.add_edge(central_node, node)
+                            edges.append((central_node, node))
+                            edge_colors.append(edge_color_for_relationship(relationship_mapping.get(node)))
 
+                        pos = nx.spring_layout(graph, seed=42)
                         fig, ax = plt.subplots()
                         nx.draw(
                             graph,
+                            pos=pos,
                             with_labels=True,
                             node_size=2000,
                             node_color="skyblue",
                             font_size=16,
                             font_weight="bold",
-                            edge_color="gray",
+                            edge_color=edge_colors,
+                            edgelist=edges,
+                            width=2,
                             ax=ax,
                         )
                         st.pyplot(fig)
