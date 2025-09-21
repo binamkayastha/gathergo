@@ -1,1 +1,1 @@
-streamlit run my_app.py --server.port=$PORT
+streamlit run main.py --server.port=$PORT
