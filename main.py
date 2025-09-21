@@ -75,6 +75,8 @@ def person_form_dialog() -> None:
             options=relationship_options,
         )
 
+        location = st.text_input("Where do you/they live (city, state, and country)?")
+
         interests = st.text_input("What are your/their interests?")
 
         st.caption("Ingore the questions below for yourself")
@@ -94,7 +96,6 @@ def person_form_dialog() -> None:
             options=life_stage_options,
         )
 
-        location = st.text_input("Where do they live (city, state, and country)?")
 
         relative_age = st.selectbox(
             "They are?",
@@ -108,11 +109,11 @@ def person_form_dialog() -> None:
         entry = {
             "person_name": person_name,
             "relationship_type": "" if relationship == relationship_options[0] else relationship,
+            "location": location,
             "interests": interests,
             "communication_frequency": "" if contact_frequency == frequency_options[0] else contact_frequency,
             "relationship_duration": "" if known_duration == duration_options[0] else known_duration,
             "life_stage_similarity": "" if life_stage == life_stage_options[0] else life_stage,
-            "location": location,
             "age_relative": "" if relative_age == relative_age_options[0] else relative_age,
         }
 
