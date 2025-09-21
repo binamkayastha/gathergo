@@ -52,10 +52,6 @@ relative_age_options = [
 
 trigger_rerun = getattr(st, "rerun", None) or getattr(st, "experimental_rerun", None)
 
-dialog_decorator = getattr(st, "dialog", None)
-if dialog_decorator is None or not callable(dialog_decorator):
-    dialog_decorator = getattr(st, "experimental_dialog", None)
-
 if "show_form" not in st.session_state:
     st.session_state.show_form = False
 
@@ -64,70 +60,63 @@ def _append_contact(entry: dict[str, str]) -> None:
     st.session_state.contacts.append(entry)
 
 
-if dialog_decorator is not None:
 
-    @dialog_decorator("Add Person")
-    def person_form_dialog() -> None:
-        with st.form("relationship_form", clear_on_submit=True):
-            person_name = st.text_input("What is the person's name?")
+@st.dialog("Add Person")
+def person_form_dialog() -> None:
+    with st.form("relationship_form", clear_on_submit=True):
+        person_name = st.text_input("What is the person's name?")
 
-            relationship = st.selectbox(
-                "What is your relationship with them?",
-                options=relationship_options,
-            )
+        relationship = st.selectbox(
+            "What is your relationship with them?",
+            options=relationship_options,
+        )
 
-            contact_frequency = st.selectbox(
-                "How often do you speak with them?",
-                options=frequency_options,
-            )
+        contact_frequency = st.selectbox(
+            "How often do you speak with them?",
+            options=frequency_options,
+        )
 
-            known_duration = st.selectbox(
-                "How long have you known them?",
-                options=duration_options,
-            )
+        known_duration = st.selectbox(
+            "How long have you known them?",
+            options=duration_options,
+        )
 
-            life_stage = st.selectbox(
-                "Their life stage is?",
-                options=life_stage_options,
-            )
+        life_stage = st.selectbox(
+            "Their life stage is?",
+            options=life_stage_options,
+        )
 
-            location = st.text_input("Where do they live (city, state, and country)?")
+        location = st.text_input("Where do they live (city, state, and country)?")
 
-            relative_age = st.selectbox(
-                "Their are?",
-                options=relative_age_options,
-            )
+        relative_age = st.selectbox(
+            "Their are?",
+            options=relative_age_options,
+        )
 
-            save = st.form_submit_button("Save person")
-            cancel = st.form_submit_button("Cancel", type="secondary")
+        save = st.form_submit_button("Save person")
+        cancel = st.form_submit_button("Cancel", type="secondary")
 
-        if save:
-            entry = {
-                "person_name": person_name,
-                "relationship_type": "" if relationship == relationship_options[0] else relationship,
-                "communication_frequency": "" if contact_frequency == frequency_options[0] else contact_frequency,
-                "relationship_duration": "" if known_duration == duration_options[0] else known_duration,
-                "life_stage_similarity": "" if life_stage == life_stage_options[0] else life_stage,
-                "location": location,
-                "age_relative": "" if relative_age == relative_age_options[0] else relative_age,
-            }
+    if save:
+        entry = {
+            "person_name": person_name,
+            "relationship_type": "" if relationship == relationship_options[0] else relationship,
+            "communication_frequency": "" if contact_frequency == frequency_options[0] else contact_frequency,
+            "relationship_duration": "" if known_duration == duration_options[0] else known_duration,
+            "life_stage_similarity": "" if life_stage == life_stage_options[0] else life_stage,
+            "location": location,
+            "age_relative": "" if relative_age == relative_age_options[0] else relative_age,
+        }
 
-            _append_contact(entry)
-            st.session_state.show_form = False
-
-            if trigger_rerun is not None:
-                trigger_rerun()
-
-        if cancel:
-            st.session_state.show_form = False
-            if trigger_rerun is not None:
-                trigger_rerun()
-
-else:
-
-    def person_form_dialog() -> None:
-        st.warning("This version of Streamlit does not support dialogs.")
+        _append_contact(entry)
         st.session_state.show_form = False
+
+        if trigger_rerun is not None:
+            trigger_rerun()
+
+    if cancel:
+        st.session_state.show_form = False
+        if trigger_rerun is not None:
+            trigger_rerun()
 
 
 if st.button("Add person"):
