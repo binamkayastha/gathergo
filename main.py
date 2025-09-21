@@ -237,3 +237,44 @@ with col_actions[1]:
 if st.session_state.gemini_response:
     st.subheader("Gemini response")
     st.json(st.session_state.gemini_response)
+
+
+# Sidra code
+import streamlit as st
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# Title
+st.title("connection")
+print(pd.DataFrame(st.session_state.contacts))
+
+# Create graph
+G = nx.Graph()
+# Define nodes
+central_node = "Jun"
+other_nodes = pd.DataFrame(st.session_state.contacts).person_name
+
+# Create graph
+G = nx.Graph()
+G.add_node(central_node)
+G.add_nodes_from(other_nodes)
+
+# Add edges from Jun to everyone else
+for node in other_nodes:
+    G.add_edge(central_node, node)
+
+# Draw graph
+fig, ax = plt.subplots()
+nx.draw(
+    G,
+    with_labels=True,
+    node_size=2000,
+    node_color="skyblue",
+    font_size=16,
+    font_weight="bold",
+    edge_color="gray",
+    ax=ax
+)
+
+# Display in Streamlit
+st.pyplot(fig)
