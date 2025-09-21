@@ -75,6 +75,8 @@ def person_form_dialog() -> None:
             options=relationship_options,
         )
 
+        interests = st.text_input("What are their interests?")
+
         contact_frequency = st.selectbox(
             "How often do you speak with them?",
             options=frequency_options,
@@ -104,6 +106,7 @@ def person_form_dialog() -> None:
         entry = {
             "person_name": person_name,
             "relationship_type": "" if relationship == relationship_options[0] else relationship,
+            "interests": interests,
             "communication_frequency": "" if contact_frequency == frequency_options[0] else contact_frequency,
             "relationship_duration": "" if known_duration == duration_options[0] else known_duration,
             "life_stage_similarity": "" if life_stage == life_stage_options[0] else life_stage,
