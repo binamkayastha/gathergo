@@ -2,12 +2,16 @@ import streamlit as st
 import pandas as pd
 
 st.title('Gather Go')
+st.caption("Don't forget to add yourself!")
 
 if "contacts" not in st.session_state:
     st.session_state.contacts = []
 
+SELF_RELATIONSHIP = "Yourself"
+
 relationship_options = [
     "Select relationship",
+    SELF_RELATIONSHIP,
     "Immediate family",
     "Extended family",
     "Close friends",
