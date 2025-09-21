@@ -1,6 +1,9 @@
+import os
+from typing import Any, Dict, Optional
+
 import streamlit as st
 import pandas as pd
-from streamlit.elements.media import YOUTUBE_RE
+import requests
 
 st.title('Gather Go')
 st.caption("Don't forget to add yourself!")
@@ -8,11 +11,9 @@ st.caption("Don't forget to add yourself!")
 if "contacts" not in st.session_state:
     st.session_state.contacts = []
 
-SELF_RELATIONSHIP = "Yourself"
-
 relationship_options = [
     "Select relationship",
-    SELF_RELATIONSHIP,
+    "Yourself",
     "Immediate family",
     "Extended family",
     "Close friends",
@@ -61,7 +62,7 @@ if "show_form" not in st.session_state:
     st.session_state.show_form = False
 
 
-def _append_contact(entry: dict[str, str]) -> None:
+def _append_contact(entry: Dict[str, str]) -> None:
     st.session_state.contacts.append(entry)
 
 
@@ -75,11 +76,7 @@ def person_form_dialog() -> None:
             options=relationship_options,
         )
 
-        location = st.text_input("Where do you/they live (city, state, and country)?")
-
-        interests = st.text_input("What are your/their interests?")
-
-        st.caption("Ingore the questions below for yourself")
+        interests = st.text_input("What are their interests?")
 
         contact_frequency = st.selectbox(
             "How often do you speak with them?",
@@ -96,9 +93,10 @@ def person_form_dialog() -> None:
             options=life_stage_options,
         )
 
+        location = st.text_input("Where do they live (city, state, and country)?")
 
         relative_age = st.selectbox(
-            "They are?",
+            "Their are?",
             options=relative_age_options,
         )
 
@@ -109,11 +107,11 @@ def person_form_dialog() -> None:
         entry = {
             "person_name": person_name,
             "relationship_type": "" if relationship == relationship_options[0] else relationship,
-            "location": location,
             "interests": interests,
             "communication_frequency": "" if contact_frequency == frequency_options[0] else contact_frequency,
             "relationship_duration": "" if known_duration == duration_options[0] else known_duration,
             "life_stage_similarity": "" if life_stage == life_stage_options[0] else life_stage,
+            "location": location,
             "age_relative": "" if relative_age == relative_age_options[0] else relative_age,
         }
 
@@ -136,14 +134,67 @@ if st.session_state.show_form:
     person_form_dialog()
 
 if st.session_state.contacts:
-    st.dataframe(pd.DataFrame(st.session_state.contacts))
+    contacts_df = pd.DataFrame(st.session_state.contacts)
+    st.dataframe(contacts_df)
 else:
     st.info("Add someone to start building your list.")
 
 st.write("---")
 
+if "gemini_response" not in st.session_state:
+    st.session_state.gemini_response = None
+
+
+def call_gemini(contacts: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        st.error("GEMINI_API_KEY not set in environment.")
+        return None
+
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "X-goog-api-key": api_key,
+    }
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": "Please find ways that I can build stronger connections with the people in my contacts. I am 'Yourself' in this data: " + contacts.to_json(orient="records") if not contacts.empty else "[]",
+                    }
+                ]
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as exc:
+        st.error(f"Gemini API request failed: {exc}")
+    except ValueError:
+        st.error("Gemini API returned non-JSON response.")
+
+    return None
+
+
 col_actions = st.columns(2)
+
 with col_actions[0]:
     st.button("Visualize connections")
+
 with col_actions[1]:
-    st.button("Suggest plans")
+    if st.button("Suggest plans"):
+        if not st.session_state.contacts:
+            st.warning("Add at least one person before requesting plan suggestions.")
+        else:
+            result = call_gemini(pd.DataFrame(st.session_state.contacts))
+            if result is not None:
+                st.session_state.gemini_response = result
+
+if st.session_state.gemini_response:
+    st.subheader("Gemini response")
+    st.json(st.session_state.gemini_response)
