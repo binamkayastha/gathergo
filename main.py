@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from streamlit.elements.media import YOUTUBE_RE
 
 st.title('Gather Go')
 st.caption("Don't forget to add yourself!")
@@ -64,7 +65,6 @@ def _append_contact(entry: dict[str, str]) -> None:
     st.session_state.contacts.append(entry)
 
 
-
 @st.dialog("Add Person")
 def person_form_dialog() -> None:
     with st.form("relationship_form", clear_on_submit=True):
@@ -75,7 +75,9 @@ def person_form_dialog() -> None:
             options=relationship_options,
         )
 
-        interests = st.text_input("What are their interests?")
+        interests = st.text_input("What are your/their interests?")
+
+        st.caption("Ingore the questions below for yourself")
 
         contact_frequency = st.selectbox(
             "How often do you speak with them?",
@@ -95,7 +97,7 @@ def person_form_dialog() -> None:
         location = st.text_input("Where do they live (city, state, and country)?")
 
         relative_age = st.selectbox(
-            "Their are?",
+            "They are?",
             options=relative_age_options,
         )
 
@@ -136,3 +138,11 @@ if st.session_state.contacts:
     st.dataframe(pd.DataFrame(st.session_state.contacts))
 else:
     st.info("Add someone to start building your list.")
+
+st.write("---")
+
+col_actions = st.columns(2)
+with col_actions[0]:
+    st.button("Visualize connections")
+with col_actions[1]:
+    st.button("Suggest plans")
